@@ -1,0 +1,23 @@
+replicaCount: 1
+
+image:
+  repository: asia-southeast1-docker.pkg.dev/microservice-lab-457503503/docker-repo/product-service # <-- CHANGE THIS
+  pullPolicy: IfNotPresent
+  tag: ""
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+resources: {}
+probes:
+  enabled: true
+  path: /healthz
+  port: 8080
+serviceAccount:
+  create: false
+  name: ""
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,37 @@
+replicaCount: 1
+
+image:
+  repository: asia-southeast1-docker.pkg.dev/microservice-lab-457503503/docker-repo/user-service # <-- CHANGE THIS
+  pullPolicy: IfNotPresent
+  # tag is usually set globally via umbrella chart or CI/CD pipeline
+  tag: ""
+
+service:
+  type: ClusterIP
+  port: 80 # Service port
+  targetPort: 8080 # Container port
+
+# Optional: Resource limits and requests
+resources: {}
+#  limits:
+#    cpu: 100m
+#    memory: 128Mi
+#  requests:
+#    cpu: 50m
+#    memory: 64Mi
+
+# Optional: Liveness and Readiness probes
+probes:
+  enabled: true
+  path: /healthz
+  port: 8080 # Same as targetPort
+
+# Optional: Service account settings
+serviceAccount:
+  create: false
+  name: ""
+
+# Optional: Node selector, tolerations, affinity
+nodeSelector: {}
+tolerations: []
+affinity: {}

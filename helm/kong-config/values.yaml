@@ -1,0 +1,42 @@
+# Enable/disable creation of the Ingress resource
+ingress:
+  enabled: true
+  # Default host, can be overridden
+  # If using a real domain, set it here. Otherwise, rely on Kong's External IP.
+  host: ""
+  # Default Ingress class for Kong. Check your Kong installation for the correct one.
+  # Common values: "kong", or a custom name if you specified one during install.
+  # For newer K8s versions (>1.18), use ingressClassName instead of annotation.
+  # ingressClassName: kong
+  annotations:
+    kubernetes.io/ingress.class: kong
+    # konghq.com/strip-path: "true" # Often useful to remove the matched path prefix
+
+# Define which services should have routes created
+services:
+  user:
+    enabled: true
+    path: /users
+    # Service name will be constructed like: {{ .Release.Name }}-user-service
+    serviceNameSuffix: user-service
+    servicePort: 80
+  product:
+    enabled: true
+    path: /products
+    serviceNameSuffix: product-service
+    servicePort: 80
+  order:
+    enabled: true
+    path: /orders
+    serviceNameSuffix: order-service
+    servicePort: 80
+
+# Placeholder for KongPlugins, KongConsumers etc. if needed later
+# Example:
+# plugins:
+#   rateLimiting:
+#     enabled: true
+#     name: rate-limit-all
+#     config:
+#       minute: 5
+#       policy: local

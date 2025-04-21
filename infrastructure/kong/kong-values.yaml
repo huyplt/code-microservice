@@ -1,0 +1,16 @@
+# kong-values.yaml (Cho phép Helm cài CRDs)
+
+namespace: kong # Cài vào namespace kong
+
+ingressController:
+  enabled: true
+  ingressClass: kong # Đặt tên ingress class là 'kong'
+  # --- Dòng sau KHÔNG ĐƯỢC là false ---
+  # installCRDs: true # Hoặc bỏ trống dòng này (mặc định thường là true)
+
+env:
+  database: "off" # Chạy chế độ DB-less
+
+proxy:
+  type: LoadBalancer # Yêu cầu GKE cấp IP Public
+

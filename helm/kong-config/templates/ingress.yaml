@@ -1,0 +1,36 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-kong-ingress
+  labels:
+    app.kubernetes.io/name: kong-ingress
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  {{- if .Values.ingress.ingressClassName }}
+  ingressClassName: {{ .Values.ingress.ingressClassName }}
+  {{- end }}
+  rules:
+  {{- if .Values.ingress.host }}
+  - host: {{ .Values.ingress.host }}
+    http:
+  {{- else }}
+  - http:
+  {{- end }}
+      paths:
+      {{- range $key, $service := .Values.services }}
+      {{- if $service.enabled }}
+      - path: {{ $service.path }}
+        pathType: Prefix # Or ImplementationSpecific if using complex regex with KongIngress
+        backend:
+          service:
+            # Construct the service name based on the release name and the service suffix
+            name: {{ printf "%s-%s" $.Release.Name $service.serviceNameSuffix }}
+            port:
+              number: {{ $service.servicePort }}
+      {{- end }}
+      {{- end }}
+{{- end }}

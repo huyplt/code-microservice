@@ -1,0 +1,51 @@
+# Global values that can be accessed by all subcharts using {{ .Values.global.* }}
+global:
+  # Set the image tag globally for all services
+  imageTag: "latest" # Default tag, override via --set or specific values below
+  # Example global setting (not used in current templates, but shows possibility)
+  # environment: production
+
+# Override values for the user-service subchart
+user-service:
+  enabled: true # Control if this subchart is deployed
+  replicaCount: 2
+  image:
+    # You can override the repository here if needed, otherwise it uses its own default
+    # repository: your-registry/user-service
+    # Global tag takes precedence unless overridden here
+    tag: "" # Let global.imageTag be used, or set a specific tag here.
+
+# Override values for the product-service subchart
+product-service:
+  enabled: true
+  replicaCount: 1
+  image:
+    # repository: your-registry/product-service
+    tag: ""
+  # Example of overriding resources for a specific service
+  resources:
+   limits:
+     cpu: 150m
+     memory: 192Mi
+   requests:
+     cpu: 75m
+     memory: 96Mi
+
+# Override values for the order-service subchart
+order-service:
+  enabled: true
+  replicaCount: 1
+  image:
+    # repository: your-registry/order-service
+    tag: ""
+
+# Override values for the kong-config subchart
+kong-config:
+  enabled: true
+  ingress:
+    # Override host if needed, e.g., for different environments
+    # host: myapp.staging.example.com
+    # Example: Disable a specific service route via the Kong config chart values
+    # services:
+    #   order:
+    #     enabled: false

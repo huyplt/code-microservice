@@ -1,0 +1,164 @@
+name: Microservices CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main # Trigger on pushes to the main branch
+  pull_request:
+    branches:
+      - main # Trigger on pull requests targeting main
+
+env:
+  # --- CHANGE THESE ---
+  GCP_PROJECT_ID: your-gcp-project-id
+  GKE_CLUSTER_NAME: your-gke-cluster-name
+  GKE_LOCATION: your-gke-cluster-location # e.g., us-central1, europe-west1-b
+  GAR_LOCATION: your-artifact-registry-location # e.g., us-central1
+  GAR_REPOSITORY: your-artifact-registry-repo-name # e.g., my-microservices-repo
+  DEPLOY_NAMESPACE: production # Target K8s namespace for deployment
+  HELM_RELEASE_NAME: prod-app # Helm release name
+  # --- END CHANGES ---
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21' # Match Go version used in Dockerfiles
+
+      # Add linters and tests here if you have them
+      # Example:
+      # - name: Run Go Vet & Lint
+      #   run: |
+      #     go install honnef.co/go/tools/cmd/staticcheck@latest
+      #     find services -name '*.go' -print0 | xargs -0 -I {} dirname {} | sort -u | xargs -I {} sh -c 'cd {}; go vet ./...; staticcheck ./...'
+
+      # - name: Run Unit Tests (if applicable)
+      #   run: |
+      #     find services -name '*.go' -print0 | xargs -0 -I {} dirname {} | sort -u | xargs -I {} sh -c 'cd {}; go test ./...'
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0' # Specify Helm version
+
+      - name: Lint Helm Charts
+        run: |
+          helm lint helm/user-service
+          helm lint helm/product-service
+          helm lint helm/order-service
+          helm lint helm/kong-config
+          helm dependency build helm/umbrella-chart # Build deps before linting umbrella
+          helm lint helm/umbrella-chart
+
+  build-and-push:
+    name: Build & Push Images
+    needs: lint-and-test # Run after linting/testing
+    runs-on: ubuntu-latest
+    # Only run on pushes to main (not on PRs for this job)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: 'read'
+      id-token: 'write' # Needed for Workload Identity Federation
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Authenticate to Google Cloud using Workload Identity Federation
+      - name: Authenticate to Google Cloud
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: 'projects/${{ env.GCP_PROJECT_ID }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider' # Replace with your WIF Pool/Provider
+          service_account: 'your-github-actions-sa@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com' # Replace with your SA email
+
+      # Set up gcloud CLI (needed for docker-credential-gcr)
+      - name: Set up Cloud SDK
+        uses: 'google-github-actions/setup-gcloud@v2'
+
+      # Configure Docker to use Artifact Registry credentials
+      - name: Configure Docker credentials for GAR
+        run: gcloud auth configure-docker ${{ env.GAR_LOCATION }}-docker.pkg.dev
+
+      # Use git sha for image tag for traceability
+      - name: Set Image Tag
+        id: image_tag
+        run: echo "tag=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      # Build and push images using the script
+      - name: Build and Push Docker Images
+        env:
+          # Construct the full GAR path
+          IMAGE_REGISTRY: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}
+          IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
+        run: |
+          chmod +x ./scripts/build_push.sh
+          ./scripts/build_push.sh "$IMAGE_TAG" # Pass tag to script
+        # Override REGISTRY env var used inside build_push.sh
+        shell: bash -eo pipefail {0} # Ensure script errors fail the step
+
+      # Store the tag as an artifact for the deploy job
+      - name: Upload Image Tag Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-tag
+          path: |
+            ./image_tag.txt # Create a file containing the tag
+          retention-days: 1
+        # Create the file needed for the artifact
+        run: echo "${{ steps.image_tag.outputs.tag }}" > ./image_tag.txt
+
+  deploy-to-gke:
+    name: Deploy to GKE
+    needs: build-and-push # Run after successful build and push
+    runs-on: ubuntu-latest
+    # Only run on pushes to main
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: 'read'
+      id-token: 'write' # Needed for Workload Identity Federation
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Authenticate to Google Cloud
+      - name: Authenticate to Google Cloud
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: 'projects/${{ env.GCP_PROJECT_ID }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'your-github-actions-sa@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com'
+
+      # Set up gcloud CLI
+      - name: Set up Cloud SDK
+        uses: 'google-github-actions/setup-gcloud@v2'
+
+      # Get GKE credentials
+      - name: Get GKE Credentials
+        run: gcloud container clusters get-credentials ${{ env.GKE_CLUSTER_NAME }} --location ${{ env.GKE_LOCATION }}
+
+      # Download the image tag artifact
+      - name: Download Image Tag Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: image-tag
+          path: ./
+
+      - name: Read Image Tag
+        id: image_tag
+        run: echo "tag=$(cat ./image_tag.txt)" >> $GITHUB_OUTPUT
+
+      # Deploy using the script
+      - name: Deploy Application via Helm
+        run: |
+          chmod +x ./scripts/deploy.sh
+          ./scripts/deploy.sh "${{ env.DEPLOY_NAMESPACE }}" "${{ env.HELM_RELEASE_NAME }}" "${{ steps.image_tag.outputs.tag }}"
+        shell: bash -eo pipefail {0}
