@@ -105,6 +105,8 @@ jobs:
         shell: bash -eo pipefail {0} # Ensure script errors fail the step
 
       # Store the tag as an artifact for the deploy job
+      - name: Create image_tag.txt file  # Đặt tên rõ ràng cho bước này
+        run: echo "${{ steps.image_tag.outputs.tag }}" > ./image_tag.tx
       - name: Upload Image Tag Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -113,8 +115,7 @@ jobs:
             ./image_tag.txt # Create a file containing the tag
           retention-days: 1
         # Create the file needed for the artifact
-      - name: run Upload Image Tag Artifact
-        run: echo "${{ steps.image_tag.outputs.tag }}" > ./image_tag.txt
+      
 
   deploy-to-gke:
     name: Deploy to GKE
