@@ -5,11 +5,30 @@ namespace: kong # Cài vào namespace kong
 ingressController:
   enabled: true
   ingressClass: kong # Đặt tên ingress class là 'kong'
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi # Có thể giữ nguyên request hoặc tăng nhẹ
+    limits:
+      cpu: 500m # Giữ nguyên hoặc tăng nếu cần
+      memory: 512Mi # <-- TĂNG GIÁ TRỊ NÀY LÊN (ví dụ: 512Mi, 768Mi, hoặc 1Gi)
+
+# Cấu hình cho Deployment chính (chứa proxy)
+deployment:
+  # Thêm hoặc sửa phần resources
+  resources:
+    requests:
+      cpu: 150m # Có thể giữ nguyên request hoặc tăng nhẹ
+      memory: 256Mi
+    limits:
+      cpu: 1000m # (1 core) Giữ nguyên hoặc tăng nếu cần
+      memory: 1Gi
   # --- Dòng sau KHÔNG ĐƯỢC là false ---
   # installCRDs: true # Hoặc bỏ trống dòng này (mặc định thường là true)
 
 env:
   database: "off" # Chạy chế độ DB-less
+  admin_listen: "127.0.0.1:8444 http2 ssl"
 
 proxy:
   type: LoadBalancer # Yêu cầu GKE cấp IP Public

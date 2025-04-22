@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: asia-southeast1-docker.pkg.dev/microservice-lab-457503503/docker-repo/user-service # <-- CHANGE THIS
+  repository: asia-southeast1-docker.pkg.dev/microservice-lab-457503/docker-repo/user-service # <-- CHANGE THIS
   pullPolicy: IfNotPresent
   # tag is usually set globally via umbrella chart or CI/CD pipeline
   tag: ""

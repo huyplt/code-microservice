@@ -1,0 +1,15 @@
+dependencies:
+- name: user-service
+  repository: file://../user-service
+  version: 0.1.0
+- name: product-service
+  repository: file://../product-service
+  version: 0.1.0
+- name: order-service
+  repository: file://../order-service
+  version: 0.1.0
+- name: kong-config
+  repository: file://../kong-config
+  version: 0.1.0
+digest: sha256:beb2315082cb393144c85c7b466778cfa3f5d1a8ab4563f0f769a873ef220128
+generated: "2025-04-22T02:20:57.905084406Z"

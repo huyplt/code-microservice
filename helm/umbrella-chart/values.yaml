@@ -11,7 +11,7 @@ user-service:
   replicaCount: 2
   image:
     # You can override the repository here if needed, otherwise it uses its own default
-    # repository: your-registry/user-service
+    repository: asia-southeast1-docker.pkg.dev/microservice-lab-457503/docker-repo/user-service
     # Global tag takes precedence unless overridden here
     tag: "" # Let global.imageTag be used, or set a specific tag here.
 
@@ -20,7 +20,7 @@ product-service:
   enabled: true
   replicaCount: 1
   image:
-    # repository: your-registry/product-service
+    repository: asia-southeast1-docker.pkg.dev/microservice-lab-457503/docker-repo/product-service
     tag: ""
   # Example of overriding resources for a specific service
   resources:
@@ -36,16 +36,19 @@ order-service:
   enabled: true
   replicaCount: 1
   image:
-    # repository: your-registry/order-service
+    repository: asia-southeast1-docker.pkg.dev/microservice-lab-457503/docker-repo/order-service
     tag: ""
 
 # Override values for the kong-config subchart
 kong-config:
   enabled: true
   ingress:
+    enabled: true
+    ingressClassName: kong
     # Override host if needed, e.g., for different environments
     # host: myapp.staging.example.com
     # Example: Disable a specific service route via the Kong config chart values
     # services:
     #   order:
-    #     enabled: false
+
+          #     enabled: false

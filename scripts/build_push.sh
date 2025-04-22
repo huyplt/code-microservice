@@ -5,7 +5,7 @@ set -e
 
 # --- Configuration ---
 # CHANGE THIS to your container registry
-REGISTRY="asia-southeast1-docker.pkg.dev/microservice-lab-457503503/docker-repo"
+REGISTRY="asia-southeast1-docker.pkg.dev/microservice-lab-457503/docker-repo"
 # Default tag if none provided
 DEFAULT_TAG="latest"
 # --- End Configuration ---
