@@ -21,7 +21,8 @@ spec:
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default ( coalesce .Values.global.imageTag .Chart.AppVersion ) | default "latest" }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default ( get .Values.global "imageTag" ) | default .Chart.AppVersion | default "latest" }}"
+
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
