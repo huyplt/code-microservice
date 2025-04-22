@@ -10,7 +10,7 @@ on:
 
 env:
   # --- CHANGE THESE ---
-  GCP_PROJECT_ID: 457503
+  GCP_PROJECT_ID: microservice-lab-457503
   GKE_CLUSTER_NAME: my-first-cluster
   GKE_LOCATION: asia-southeast1-a # e.g., us-central1, europe-west1-b
   GAR_LOCATION: asia-southeast1 # e.g., us-central1
