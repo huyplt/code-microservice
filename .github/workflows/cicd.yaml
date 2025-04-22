@@ -106,31 +106,17 @@ jobs:
 
       # Store the tag as an artifact for the deploy job
       - name: Create image_tag.txt file  # Đặt tên rõ ràng cho bước này
-        run: |
-          echo "Attempting to create image_tag.txt..."
-          TAG_VALUE="${{ steps.image_tag.outputs.tag }}"
-          echo "Tag value is: [${TAG_VALUE}]"
-          if [ -z "${TAG_VALUE}" ]; then
-            echo "Error: Tag value is empty! Cannot create file."
-            exit 1 # Dừng workflow nếu tag rỗng
-          fi
-          echo "Creating file with tag: ${TAG_VALUE}"
-          echo "${TAG_VALUE}" > ./image_tag.txt
-          ls -l ./image_tag.txt # Kiểm tra ngay sau khi tạo
-          echo "File image_tag.txt should be created now."
+        run: echo "${{ steps.image_tag.outputs.tag }}" > ${{ github.workspace }}/image_tag.txt
       - name: Verify image_tag.txt creation
         run: |
-          echo "Checking again if ./image_tag.txt exists..."
-          ls -l ./image_tag.txt
-          echo "Content of ./image_tag.txt:"
-          cat ./image_tag.txt
-          echo "Verification complete."
+          echo "Working directory is: $(pwd)" # Kiểm tra thư mục làm việc
+          ls -l ${{ github.workspace }}/image_tag.txt
+          cat ${{ github.workspace }}/image_tag.txt
       - name: Upload Image Tag Artifact
         uses: actions/upload-artifact@v4
         with:
           name: image-tag
-          path: |
-            ./image_tag.txt # Create a file containing the tag
+          path: ${{ github.workspace }}/image_tag.txt # <-- Sử dụng đường dẫn tuyệt đối
           retention-days: 1
         # Create the file needed for the artifact
       
