@@ -10,11 +10,11 @@ on:
 
 env:
   # --- CHANGE THESE ---
-  GCP_PROJECT_ID: your-gcp-project-id
-  GKE_CLUSTER_NAME: your-gke-cluster-name
-  GKE_LOCATION: your-gke-cluster-location # e.g., us-central1, europe-west1-b
-  GAR_LOCATION: your-artifact-registry-location # e.g., us-central1
-  GAR_REPOSITORY: your-artifact-registry-repo-name # e.g., my-microservices-repo
+  GCP_PROJECT_ID: 457503
+  GKE_CLUSTER_NAME: my-first-cluster
+  GKE_LOCATION: asia-southeast1-a # e.g., us-central1, europe-west1-b
+  GAR_LOCATION: asia-southeast1 # e.g., us-central1
+  GAR_REPOSITORY: docker-repo # e.g., my-microservices-repo
   DEPLOY_NAMESPACE: production # Target K8s namespace for deployment
   HELM_RELEASE_NAME: prod-app # Helm release name
   # --- END CHANGES ---
@@ -54,7 +54,7 @@ jobs:
           helm lint helm/product-service
           helm lint helm/order-service
           helm lint helm/kong-config
-          helm dependency build helm/umbrella-chart # Build deps before linting umbrella
+          helm dependency build helm/umbrella-chart 
           helm lint helm/umbrella-chart
 
   build-and-push:
@@ -76,8 +76,8 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: 'google-github-actions/auth@v2'
         with:
-          workload_identity_provider: 'projects/${{ env.GCP_PROJECT_ID }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider' # Replace with your WIF Pool/Provider
-          service_account: 'your-github-actions-sa@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com' # Replace with your SA email
+          workload_identity_provider: 'projects/918873503816/locations/global/workloadIdentityPools/github-pool/providers/github-provider' # Replace with your WIF Pool/Provider
+          service_account: 'github-actions-wif-sa@microservice-lab-457503.iam.gserviceaccount.com' # Replace with your SA email
 
       # Set up gcloud CLI (needed for docker-credential-gcr)
       - name: Set up Cloud SDK
@@ -134,8 +134,8 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: 'google-github-actions/auth@v2'
         with:
-          workload_identity_provider: 'projects/${{ env.GCP_PROJECT_ID }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
-          service_account: 'your-github-actions-sa@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com'
+          workload_identity_provider: 'projects/918873503816/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'github-actions-wif-sa@microservice-lab-457503.iam.gserviceaccount.com'
 
       # Set up gcloud CLI
       - name: Set up Cloud SDK
