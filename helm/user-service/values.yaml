@@ -11,6 +11,9 @@ service:
   port: 80 # Service port
   targetPort: 8080 # Container port
 
+global:
+  imageTag: "latest"
+
 # Optional: Resource limits and requests
 resources: {}
 #  limits:

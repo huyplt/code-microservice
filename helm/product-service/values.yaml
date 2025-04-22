@@ -10,6 +10,9 @@ service:
   port: 80
   targetPort: 8080
 
+global:
+  imageTag: "latest"
+
 resources: {}
 probes:
   enabled: true
