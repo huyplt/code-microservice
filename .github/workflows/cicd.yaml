@@ -50,12 +50,12 @@ jobs:
 
       - name: Lint Helm Charts
         run: |
-          helm lint helm/user-service
-          helm lint helm/product-service
-          helm lint helm/order-service
-          helm lint helm/kong-config
+          helm lint --strict helm/user-service
+          helm lint --strict helm/product-service
+          helm lint --strict helm/order-service
+          helm lint --strict helm/kong-config
           helm dependency build helm/umbrella-chart 
-          helm lint helm/umbrella-chart
+          helm lint --strict helm/umbrella-chart
 
   build-and-push:
     name: Build & Push Images
