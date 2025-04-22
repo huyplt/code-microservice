@@ -21,7 +21,18 @@ spec:
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default ( get .Values.global "imageTag" ) | default .Chart.AppVersion | default "latest" }}"
+          image: >
+  {{- .Values.image.repository }}:{{-
+      .Values.image.tag |
+      default (
+          if (kindIs "map" .Values.global) -}} # Kiểm tra xem .Values.global có phải là map không
+            {{- get .Values.global "imageTag" | default .Chart.AppVersion -}} # Nếu là map, dùng get để lấy tag an toàn, rồi đến AppVersion
+          {{- else -}}
+            {{- .Chart.AppVersion -}} # Nếu không phải map (ví dụ: nil), chỉ dùng AppVersion
+          {{- end
+      ) |
+      default "latest"
+  -}}
 
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
