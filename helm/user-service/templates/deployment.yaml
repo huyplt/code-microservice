@@ -21,18 +21,7 @@ spec:
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
-          image: > # Sử dụng > để viết trên nhiều dòng
-  {{- .Values.image.repository }}:{{-
-      .Values.image.tag |
-      default (
-          if (kindIs "map" .Values.global) -}} # Kiểm tra .Values.global có phải là map không
-            {{- get .Values.global "imageTag" | default .Chart.AppVersion -}} # Nếu là map, dùng get để lấy tag, rồi AppVersion
-          {{- else -}}
-            {{- .Chart.AppVersion -}} # Nếu không phải map, chỉ dùng AppVersion
-          {{- end
-      ) |
-      default "latest" # Dự phòng cuối cùng
-  -}}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default ( get .Values.global "imageTag" | default .Chart.AppVersion ) | default "latest" }}"
 
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
