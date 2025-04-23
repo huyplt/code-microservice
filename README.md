@@ -1,4 +1,4 @@
-![anh](./Screenshot 2025-04-23 105524.png)
+
 ## Thiết lập Môi trường Cục bộ (Để build/deploy)
 
 1.  **Clone Repository:**
