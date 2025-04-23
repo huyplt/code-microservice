@@ -1,4 +1,4 @@
-
+![Ảnh chụp màn hình](screenshot.jpg)
 ## Thiết lập Môi trường Cục bộ (Để build/deploy)
 
 1.  **Clone Repository:**
