@@ -125,7 +125,6 @@ jobs:
           name: image-tag
           path: ${{ github.workspace }}/image_tag.txt # <-- Sử dụng đường dẫn tuyệt đối
           retention-days: 1
-        # Create the file needed for the artifact
       
 
   deploy-to-gke:
@@ -208,11 +207,11 @@ jobs:
           echo "Updated helm/umbrella-chart/values.yaml:"
           cat helm/umbrella-chart/values.yaml
         env:
-          # Các biến env.DB_CONNECTION_NAME, env.POD_GCP_SA_EMAIL phải được định nghĩa ở khối env của workflow
-
+          DB_CONN_NAME_FOR_YQ: ${{ env.DB_CONNECTION_NAME }}
+          POD_SA_EMAIL_FOR_YQ: ${{ env.POD_GCP_SA_EMAIL }}
       # Deploy using the script
       - name: Deploy Application via Helm
         run: |
           chmod +x ./scripts/deploy.sh
-          ./scripts/deploy.sh "${{ env.DEPLOY_NAMESPACE }}" "${{ env.HELM_RELEASE_NAME }}" "${{ steps.image_tag.outputs.tag }}"
+          ./scripts/deploy.sh "${{ env.DEPLOY_NAMESPACE }}" "${{ env.HELM_RELEASE_NAME }}" "${{ steps.image_tag_reader.outputs.tag }}"
         shell: bash -eo pipefail {0}
