@@ -1,43 +1,105 @@
 # Global values that can be accessed by all subcharts using {{ .Values.global.* }}
 global:
-  # Set the image tag globally for all services
-  imageTag: "latest" # Default tag, override via --set or specific values below
-  # Example global setting (not used in current templates, but shows possibility)
-  # environment: production
+  imageTag: "latest"
+  database:
+    enabled: true # Bật database cho các service con muốn dùng
+    host: "127.0.0.1" # Mặc định nếu dùng proxy
+    port: "5432"      # Mặc định nếu dùng proxy
+    user: "app_user"
+    passwordSecretName: "db-app-user-password-secret"
+    connectionName: "microservice-lab-457503:asia-southeast1:microservices-db-instance"
+  cloudsqlproxy:
+    enabled: true # Bật proxy cho tất cả service con muốn dùng DB
+    image: "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.0"
+    proxyPort: "5432"
+  podGcpServiceAccountEmail: "microservice-cluster-sqlproxy@microservice-lab-457503.iam.gserviceaccount.com"
+  rabbitmq: # (Ví dụ, nếu có service dùng)
+    enabled: false # Mặc định tắt
+    # host: "my-rabbitmq.messaging.svc.cluster.local"
+    # port: "5672"
+    # user: "user"
+    # passwordSecretName: "rabbitmq-credentials"
+    # passwordSecretKey: "rabbitmq-password"
+  redis: # (Ví dụ, nếu có service dùng)
+    enabled: false # Mặc định tắt
+    # host: "my-redis-master.caching.svc.cluster.local"
+    # port: "6379"
+    # passwordSecretName: "redis-auth-secret"
+    # passwordSecretKey: "redis-password"
 
 # Override values for the user-service subchart
 user-service:
-  enabled: true # Control if this subchart is deployed
-  replicaCount: 2
+  enabled: true # <-- QUAN TRỌNG: BẬT SERVICE
+  replicaCount: 1
   image:
-    # You can override the repository here if needed, otherwise it uses its own default
     repository: asia-southeast1-docker.pkg.dev/microservice-lab-457503/docker-repo/user-service
-    # Global tag takes precedence unless overridden here
-    tag: "" # Let global.imageTag be used, or set a specific tag here.
+    tag: "" # Sẽ dùng global.imageTag
+  database:
+    enabled: true # User service dùng database
+    dbName: "user_service_db" # Chỉ cần ghi đè tên DB
+    # Các cấu hình khác (host, port, user, secret, connectionName) sẽ được template subchart lấy từ global
+  serviceAccount:
+    create: true
+    # gcpServiceAccountEmail sẽ được template subchart lấy từ global
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 80
+  resources:
+   requests:
+     cpu: "20m"
+     memory: "64Mi"
+   limits:
+     cpu: "100m"
+     memory: "128Mi"
 
 # Override values for the product-service subchart
 product-service:
-  enabled: true
+  enabled: true # <-- QUAN TRỌNG: BẬT SERVICE
   replicaCount: 1
   image:
     repository: asia-southeast1-docker.pkg.dev/microservice-lab-457503/docker-repo/product-service
     tag: ""
-  # Example of overriding resources for a specific service
+  database:
+    enabled: true
+    dbName: "product_service_db"
+  serviceAccount:
+    create: true
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 80
   resources:
-   limits:
-     cpu: 150m
-     memory: 192Mi
    requests:
-     cpu: 75m
-     memory: 96Mi
+     cpu: "20m"
+     memory: "64Mi"
+   limits:
+     cpu: "150m" # Giữ lại ghi đè resources nếu cần
+     memory: "192Mi"
 
 # Override values for the order-service subchart
 order-service:
-  enabled: true
+  enabled: true # <-- QUAN TRỌNG: BẬT SERVICE
   replicaCount: 1
   image:
     repository: asia-southeast1-docker.pkg.dev/microservice-lab-457503/docker-repo/order-service
     tag: ""
+  database:
+    enabled: true
+    dbName: "order_service_db"
+  serviceAccount:
+    create: true
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 80
+  resources:
+   requests:
+     cpu: "20m"
+     memory: "64Mi"
+   limits:
+     cpu: "100m"
+     memory: "128Mi"
 
 # Override values for the kong-config subchart
 kong-config:
@@ -45,10 +107,4 @@ kong-config:
   ingress:
     enabled: true
     ingressClassName: kong
-    # Override host if needed, e.g., for different environments
     # host: myapp.staging.example.com
-    # Example: Disable a specific service route via the Kong config chart values
-    # services:
-    #   order:
-
-          #     enabled: false

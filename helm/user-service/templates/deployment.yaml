@@ -13,7 +13,20 @@ spec:
     metadata:
       labels:
         {{- include "user-service.selectorLabels" . | nindent 8 }}
+      {{- /* Xử lý annotations cho Pod */}}
+      {{- $gsaEmail := .Values.serviceAccount.gcpServiceAccountEmail | default .Values.global.podGcpServiceAccountEmail -}}
+      {{- $podAnnotations := .Values.template.metadata.annotations | default dict -}}
+      {{- if or $gsaEmail (not (empty $podAnnotations)) }}
+      annotations:
+        {{- if $gsaEmail }}
+        iam.gke.io/gcp-service-account: {{ $gsaEmail }}
+        {{- end }}
+        {{- range $key, $value := $podAnnotations }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
+      {{- end }}
     spec:
+      {{- /* Xử lý serviceAccountName */}}
       {{- if .Values.serviceAccount.create }}
       serviceAccountName: {{ include "user-service.serviceAccountName" . }}
       {{- else if .Values.serviceAccount.name }}
@@ -21,29 +34,75 @@ spec:
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default ( get .Values.global "imageTag" | default .Chart.AppVersion ) | default "latest" }}"
-
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Values.global.imageTag | default .Chart.AppVersion | default "latest" }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - name: http
-              containerPort: {{ .Values.service.targetPort }}
+            - name: http # Đặt tên cho port
+              containerPort: {{ .Values.service.targetPort | int }} # Đảm bảo là số
               protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.service.targetPort | quote }}
+
+            {{- $dbEnabled := include "user-service.util.drzew" (list .Values.database.enabled .Values.global.database.enabled true) -}}
+            {{- if $dbEnabled }}
+            - name: DB_HOST
+              value: {{ .Values.database.host | default .Values.global.database.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.database.port | default .Values.global.database.port | quote }}
+            - name: DB_USER
+              value: {{ required "A DB user is required when database is enabled." (.Values.database.user | default .Values.global.database.user) | quote }}
+            - name: DB_NAME
+              value: {{ required "A DB name is required when database is enabled." .Values.database.dbName | quote }} # dbName thường là cục bộ
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "A DB password secret name is required." (.Values.database.passwordSecretName | default .Values.global.database.passwordSecretName) }}
+                  key: {{ .Values.database.passwordSecretKey | default "password" }}
+            {{- $cloudSqlProxyEnabled := include "user-service.util.drzew" (list .Values.cloudsqlproxy.enabled .Values.global.cloudsqlproxy.enabled true) -}}
+            {{- if $cloudSqlProxyEnabled }}
+            - name: DB_CONNECTION_NAME
+              value: {{ required "A DB connection name is required for Cloud SQL Proxy." (.Values.database.connectionName | default .Values.global.database.connectionName) | quote }}
+            {{- end }}
+            {{- end }}
+
+            {{- $rabbitmqEnabled := include "user-service.util.drzew" (list .Values.rabbitmq.enabled .Values.global.rabbitmq.enabled false) -}}
+            {{- if $rabbitmqEnabled }}
+            # ... (biến môi trường RabbitMQ tương tự, dùng default từ global) ...
+            {{- end }}
+
           {{- if .Values.probes.enabled }}
           livenessProbe:
             httpGet:
               path: {{ .Values.probes.path }}
-              port: {{ .Values.probes.port }}
-            initialDelaySeconds: 15
-            periodSeconds: 20
+              port: {{ .Values.probes.portName | default "http" }} # Ưu tiên tên port
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds | default 15 }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds | default 20 }}
+            # ... (các tham số probe khác)
           readinessProbe:
             httpGet:
               path: {{ .Values.probes.path }}
-              port: {{ .Values.probes.port }}
-            initialDelaySeconds: 5
-            periodSeconds: 10
+              port: {{ .Values.probes.portName | default "http" }}
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds | default 5 }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds | default 10 }}
+            # ...
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+
+        {{- $cloudSqlProxyEnabled := include "user-service.util.drzew" (list .Values.cloudsqlproxy.enabled .Values.global.cloudsqlproxy.enabled true) -}}
+        {{- if and $dbEnabled $cloudSqlProxyEnabled }}
+        - name: {{ .Values.cloudsqlproxy.proxyContainerName | default "cloud-sql-proxy" }}
+          image: "{{ .Values.cloudsqlproxy.image | default .Values.global.cloudsqlproxy.image }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          args:
+            - "--structured-logs"
+            - "--port={{ .Values.cloudsqlproxy.proxyPort | default .Values.global.cloudsqlproxy.proxyPort | default "5432" }}"
+            - "{{ required "A DB connection name is required for Cloud SQL Proxy." (.Values.database.connectionName | default .Values.global.database.connectionName) }}"
+          # securityContext: ...
+          resources:
+            {{- toYaml (.Values.cloudsqlproxy.resources | default dict) | nindent 12 }} # Cần default dict cho resources
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -56,29 +115,4 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-# --- Helper template definitions (usually in _helpers.tpl) ---
-# For simplicity, we include minimal versions here.
-{{- define "user-service.fullname" -}}
-{{- printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
 
-{{- define "user-service.labels" -}}
-helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
-app.kubernetes.io/name: {{ .Chart.Name }}
-app.kubernetes.io/instance: {{ .Release.Name }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- end -}}
-
-{{- define "user-service.selectorLabels" -}}
-app.kubernetes.io/name: {{ .Chart.Name }}
-app.kubernetes.io/instance: {{ .Release.Name }}
-{{- end -}}
-
-{{- define "user-service.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create -}}
-    {{ default (include "user-service.fullname" .) .Values.serviceAccount.name }}
-{{- else -}}
-    {{ default "default" .Values.serviceAccount.name }}
-{{- end -}}
-{{- end -}}

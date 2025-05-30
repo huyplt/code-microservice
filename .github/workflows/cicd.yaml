@@ -11,12 +11,19 @@ on:
 env:
   # --- CHANGE THESE ---
   GCP_PROJECT_ID: microservice-lab-457503
-  GKE_CLUSTER_NAME: my-first-cluster
-  GKE_LOCATION: asia-southeast1-a # e.g., us-central1, europe-west1-b
+  GKE_CLUSTER_NAME: microservice-cluster
+  GKE_LOCATION: asia-southeast1 # e.g., us-central1, europe-west1-b
   GAR_LOCATION: asia-southeast1 # e.g., us-central1
   GAR_REPOSITORY: docker-repo # e.g., my-microservices-repo
   DEPLOY_NAMESPACE: production # Target K8s namespace for deployment
   HELM_RELEASE_NAME: prod-app # Helm release name
+  DB_PASSWORD_SECRET_MANAGER_ID: "projects/918873503816/secrets/db-app-password"
+  # Tên Kubernetes Secret sẽ được tạo để chứa DB password
+  DB_PASSWORD_K8S_SECRET_NAME: "db-app-user-password-secret"
+  # Tên kết nối instance Cloud SQL (PROJECT:REGION:INSTANCE)
+  DB_CONNECTION_NAME: "microservice-lab-457503:asia-southeast1:microservice-cluster-pg-instance"
+  # Email của GCP Service Account mà các Pod GKE sẽ mạo danh để truy cập Cloud SQL
+  POD_GCP_SA_EMAIL: "microservice-cluster-sqlproxy-sa@microservice-lab-457503.iam.gserviceaccount.com"
   # --- END CHANGES ---
 
 jobs:
@@ -153,6 +160,24 @@ jobs:
       # Get GKE credentials
       - name: Get GKE Credentials
         run: gcloud container clusters get-credentials ${{ env.GKE_CLUSTER_NAME }} --location ${{ env.GKE_LOCATION }}
+      # --- : Cấu hình K8s Secret cho DB Password ---
+      - name: Configure DB Password Kubernetes Secret
+        if: env.DB_PASSWORD_SECRET_MANAGER_ID != '' && env.DB_PASSWORD_K8S_SECRET_NAME != '' # Chỉ chạy nếu có cấu hình
+        run: |
+          echo "Fetching DB password from Secret Manager: ${{ env.DB_PASSWORD_SECRET_MANAGER_ID }}"
+          DB_PASSWORD_VALUE=$(gcloud secrets versions access latest --secret="${{ env.DB_PASSWORD_SECRET_MANAGER_ID }}" --project="${{ env.GCP_PROJECT_ID }}")
+
+          if [ -z "$DB_PASSWORD_VALUE" ]; then
+            echo "Error: Failed to retrieve DB password from Secret Manager."
+            exit 1
+          fi
+
+          echo "Creating/Updating Kubernetes secret '${{ env.DB_PASSWORD_K8S_SECRET_NAME }}' in namespace '${{ env.DEPLOY_NAMESPACE }}'"
+          kubectl create secret generic ${{ env.DB_PASSWORD_K8S_SECRET_NAME }} \
+            --namespace="${{ env.DEPLOY_NAMESPACE }}" \
+            --from-literal=password="${DB_PASSWORD_VALUE}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          echo "DB Password Kubernetes Secret configured."
 
       # Download the image tag artifact
       - name: Download Image Tag Artifact
@@ -162,8 +187,28 @@ jobs:
           path: ./
 
       - name: Read Image Tag
-        id: image_tag
-        run: echo "tag=$(cat ./image_tag.txt)" >> $GITHUB_OUTPUT
+        id: image_tag-reader
+        run: |
+          if [ -f ./image_tag.txt ]; then
+            TAG_CONTENT=$(cat ./image_tag.txt)
+            echo "Image tag from artifact: [${TAG_CONTENT}]"
+            echo "tag=${TAG_CONTENT}" >> $GITHUB_OUTPUT
+          else
+            echo "Error: image_tag.txt not found after download!"
+            exit 1
+          fi
+
+      - name: Update Umbrella Chart Values
+        run: |
+          # Sử dụng yq (cần cài đặt yq trên runner hoặc dùng image có sẵn) hoặc sed
+          # Ví dụ với yq (phải có step cài yq trước: - uses: mikefarah/yq@v4)
+          yq e '.global.database.connectionName = strenv(DB_CONNECTION_NAME)' -i helm/umbrella-chart/values.yaml
+          yq e '.global.podGcpServiceAccountEmail = strenv(POD_GCP_SA_EMAIL)' -i helm/umbrella-chart/values.yaml
+          # (Thêm các giá trị khác nếu cần)
+          echo "Updated helm/umbrella-chart/values.yaml:"
+          cat helm/umbrella-chart/values.yaml
+        env:
+          # Các biến env.DB_CONNECTION_NAME, env.POD_GCP_SA_EMAIL phải được định nghĩa ở khối env của workflow
 
       # Deploy using the script
       - name: Deploy Application via Helm

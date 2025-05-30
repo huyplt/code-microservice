@@ -1,26 +1,89 @@
 replicaCount: 1
 
 image:
-  repository: asia-southeast1-docker.pkg.dev/microservice-lab-457503/docker-repo/order-service # <-- CHANGE THIS
+  repository: asia-southeast1-docker.pkg.dev/microservice-lab-457503/docker-repo/order-service
   pullPolicy: IfNotPresent
-  tag: ""
+  tag: "" # Sẽ được ghi đè bởi .Values.global.imageTag từ umbrella chart
 
 service:
   type: ClusterIP
-  port: 80
-  targetPort: 8080
+  port: 80         # Port của Kubernetes Service
+  targetPort: 8080 # Port container lắng nghe (nên là số, không phải chuỗi, trừ khi template xử lý)
+  # portName: http # (Tùy chọn) Đặt tên cho port này để dễ tham chiếu
 
-global:
-  imageTag: "latest"
+template:
+  metadata:
+    annotations: {}
+
+database:
+  enabled: true
+  host: "127.0.0.1"       # Vì dùng Cloud SQL Proxy
+  port: "5432"            # Port của Cloud SQL Proxy
+  user: ""                # Sẽ được ghi đè bởi .Values.global.database.user
+  dbName: "user_service_db"
+  passwordSecretName: ""  # Sẽ được ghi đè bởi .Values.global.database.passwordSecretName
+  connectionName: ""     # Sẽ được ghi đè bởi .Values.global.database.connectionName
+
+cloudsqlproxy:
+  enabled: true
+  image: "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.0"
+  proxyContainerName: "cloud-sql-proxy"
+  proxyPort: "5432"       # Port proxy lắng nghe (nên là số nếu template args dùng số)
+  # resources:
+  #   requests:
+  #     memory: "64Mi"
+  #     cpu: "50m"
+
+# Cấu hình cho Kubernetes Service Account
+serviceAccount:
+  create: true
+  # name: "" # Để helper tự tạo tên nếu cần. Thường không cần ghi đè nếu helper dùng fullname.
+  gcpServiceAccountEmail: "" # Sẽ được ghi đè bởi .Values.global.podGcpServiceAccountEmail từ umbrella
+  automountServiceAccountToken: true # 
+
+# (Tùy chọn) Cấu hình RabbitMQ
+rabbitmq:
+  enabled: false
+  # host: ""
+  # ...
+
+# (Tùy chọn) Cấu hình Redis
+redis:
+  enabled: false
+  # host: ""
+  # ...
+
+# KHÔNG NÊN CÓ `global:` ở đây. Các giá trị global được quản lý bởi umbrella chart.
 
 resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
 probes:
   enabled: true
   path: /healthz
-  port: 8080
-serviceAccount:
-  create: false
-  name: ""
+  portName: http # Ưu tiên dùng tên port đã định nghĩa trong service.ports và deployment.spec.template.spec.containers.ports
+  liveness:
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    timeoutSeconds: 1
+    successThreshold: 1
+    failureThreshold: 3              
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 1
+    successThreshold: 1
+    failureThreshold: 3
+  # Hoặc nếu template probe của bạn dùng .Values.probes.port:
+  # port: 8080
+
+# Không cần khối serviceAccount thứ hai ở đây nữa
+
 nodeSelector: {}
 tolerations: []
 affinity: {}

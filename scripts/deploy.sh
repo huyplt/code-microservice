@@ -56,8 +56,7 @@ helm upgrade --install "${RELEASE_NAME}" "${CHART_DIR}" \
   --create-namespace \
   --set global.imageTag="${IMAGE_TAG}" \
   --wait \
-  --timeout 10m # Adjust timeout as needed
-
+  --timeout 10m
 echo "-------------------------------------"
 echo "Deployment process initiated for release '${RELEASE_NAME}'."
 echo "Run 'kubectl get pods -n ${NAMESPACE}' to check pod status."

@@ -1,0 +1,433 @@
+---
+# Source: microservices-umbrella/charts/order-service/templates/serviceaccount.yaml
+# Trong serviceaccount.yaml của subchartapiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: my-app-order-service
+  labels:
+    helm.sh/chart: order-service-0.1.0
+    app.kubernetes.io/name: order-service
+    app.kubernetes.io/instance: my-app
+    app.kubernetes.io/version: ""
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    iam.gke.io/gcp-service-account: microservice-cluster-sqlproxy@microservice-lab-457503.iam.gserviceaccount.com
+automountServiceAccountToken:
+---
+# Source: microservices-umbrella/charts/product-service/templates/serviceaccount.yaml
+# Trong serviceaccount.yaml của subchartapiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: my-app-product-service
+  labels:
+    helm.sh/chart: product-service-0.1.0
+    app.kubernetes.io/name: product-service
+    app.kubernetes.io/instance: my-app
+    app.kubernetes.io/version: ""
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    iam.gke.io/gcp-service-account: microservice-cluster-sqlproxy@microservice-lab-457503.iam.gserviceaccount.com
+automountServiceAccountToken:
+---
+# Source: microservices-umbrella/charts/user-service/templates/serviceaccount.yaml
+# Trong serviceaccount.yaml của subchartapiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: my-app-user-service
+  labels:
+    helm.sh/chart: user-service-0.1.0
+    app.kubernetes.io/name: user-service
+    app.kubernetes.io/instance: my-app
+    app.kubernetes.io/version: ""
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    iam.gke.io/gcp-service-account: microservice-cluster-sqlproxy@microservice-lab-457503.iam.gserviceaccount.com
+automountServiceAccountToken:
+---
+# Source: microservices-umbrella/charts/order-service/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app-order-service
+  labels:
+    helm.sh/chart: order-service-0.1.0
+    app.kubernetes.io/name: order-service
+    app.kubernetes.io/instance: my-app
+    app.kubernetes.io/version: ""
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: order-service
+    app.kubernetes.io/instance: my-app
+---
+# Source: microservices-umbrella/charts/product-service/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app-product-service
+  labels:
+    helm.sh/chart: product-service-0.1.0
+    app.kubernetes.io/name: product-service
+    app.kubernetes.io/instance: my-app
+    app.kubernetes.io/version: ""
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: product-service
+    app.kubernetes.io/instance: my-app
+---
+# Source: microservices-umbrella/charts/user-service/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app-user-service
+  labels:
+    helm.sh/chart: user-service-0.1.0
+    app.kubernetes.io/name: user-service
+    app.kubernetes.io/instance: my-app
+    app.kubernetes.io/version: ""
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8080 # Can also use named port 'http' from deployment
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: user-service
+    app.kubernetes.io/instance: my-app
+---
+# Source: microservices-umbrella/charts/order-service/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app-order-service
+  labels:
+    helm.sh/chart: order-service-0.1.0
+    app.kubernetes.io/name: order-service
+    app.kubernetes.io/instance: my-app
+    app.kubernetes.io/version: ""
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: order-service
+      app.kubernetes.io/instance: my-app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: order-service
+        app.kubernetes.io/instance: my-app # Annotation cho Workload Identity
+      annotations:
+        iam.gke.io/gcp-service-account: "microservice-cluster-sqlproxy@microservice-lab-457503.iam.gserviceaccount.com"
+    spec:
+      serviceAccountName: my-app-order-service
+      containers:
+        - name: order-service
+          image: "asia-southeast1-docker.pkg.dev/microservice-lab-457503/docker-repo/order-service:latest"
+
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+
+          # --- THÊM KHỐI BIẾN MÔI TRƯỜNG Ở ĐÂY ---
+          env:
+            - name: PORT # Port mà ứng dụng Go lắng nghe
+              value: "8080"
+            - name: DB_HOST
+              value: "127.0.0.1"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: "app_user"
+            - name: DB_NAME
+              value: "order_service_db"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-app-user-password-secret
+                  key: password
+         
+       
+            # (Tùy chọn) Thêm biến môi trường cho RabbitMQ nếu service này dùng
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 20m
+              memory: 64Mi
+
+        # ---- SIDECAR CONTAINER CLOUD SQL PROXY ----
+        - name: cloud-sql-proxy # Tên của sidecar container
+          image: "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.0"
+          imagePullPolicy: IfNotPresent
+          args:
+           # - "--structured_logs"
+            - "microservice-lab-457503:asia-southeast1:microservices-db-instance"
+            - "--address=0.0.0.0" # Lắng nghe trên tất cả các interface trong Pod
+            - "--port=5432"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+# --- Helper template definitions ---
+---
+# Source: microservices-umbrella/charts/product-service/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app-product-service
+  labels:
+    helm.sh/chart: product-service-0.1.0
+    app.kubernetes.io/name: product-service
+    app.kubernetes.io/instance: my-app
+    app.kubernetes.io/version: ""
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: product-service
+      app.kubernetes.io/instance: my-app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: product-service
+        app.kubernetes.io/instance: my-app
+      annotations:
+        iam.gke.io/gcp-service-account: "microservice-cluster-sqlproxy@microservice-lab-457503.iam.gserviceaccount.com"
+    spec:
+      serviceAccountName: my-app-product-service
+      containers:
+        - name: product-service
+          image: "asia-southeast1-docker.pkg.dev/microservice-lab-457503/docker-repo/product-service:latest"
+
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: PORT # Port mà ứng dụng Go lắng nghe
+              value: "8080"
+
+            - name: DB_HOST
+              value: "127.0.0.1"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: "app_user"
+            - name: DB_NAME
+              value: "product_service_db"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-app-user-password-secret
+                  key: password
+
+            # (Tùy chọn) Thêm biến môi trường cho RabbitMQ nếu service này dùng
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 150m
+              memory: 192Mi
+            requests:
+              cpu: 20m
+              memory: 64Mi
+
+        # ---- SIDECAR CONTAINER CLOUD SQL PROXY ----
+        - name: cloud-sql-proxy # Tên của sidecar container
+          image: "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.0"
+          imagePullPolicy: IfNotPresent
+          args:
+           # - "--structured_logs"
+            - "microservice-lab-457503:asia-southeast1:microservices-db-instance"
+            - "--address=0.0.0.0" # Lắng nghe trên tất cả các interface trong Pod
+            - "--port=5432"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+# --- Helper template definitions ---
+---
+# Source: microservices-umbrella/charts/user-service/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app-user-service
+  labels:
+    helm.sh/chart: user-service-0.1.0
+    app.kubernetes.io/name: user-service
+    app.kubernetes.io/instance: my-app
+    app.kubernetes.io/version: ""
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: user-service
+      app.kubernetes.io/instance: my-app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: user-service
+        app.kubernetes.io/instance: my-app
+      annotations:
+        iam.gke.io/gcp-service-account: "microservice-cluster-sqlproxy@microservice-lab-457503.iam.gserviceaccount.com"
+    spec:
+      serviceAccountName: my-app-user-service
+      containers:
+        - name: user-service
+          image: "asia-southeast1-docker.pkg.dev/microservice-lab-457503/docker-repo/user-service:latest"
+
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+
+          # --- THÊM KHỐI BIẾN MÔI TRƯỜNG Ở ĐÂY ---
+          env:
+            - name: PORT # Port mà ứng dụng Go lắng nghe
+              value: "8080" # Chỉ thêm biến DB nếu database được bật
+            - name: DB_HOST
+              value: "127.0.0.1"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: "app_user"
+            - name: DB_NAME
+              value: "user_service_db"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-app-user-password-secret
+                  key: password
+           
+
+            # (Tùy chọn) Thêm biến môi trường cho RabbitMQ nếu service này dùng
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 20m
+              memory: 64Mi
+
+# ---- SIDECAR CONTAINER CLOUD SQL PROXY ----
+        - name: cloud-sql-proxy # Tên của sidecar container
+          image: "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.0"
+          imagePullPolicy: IfNotPresent
+          args:
+           # - "--structured-logs"
+            - "microservice-lab-457503:asia-southeast1:microservices-db-instance"
+            - "--address=0.0.0.0" # Lắng nghe trên tất cả các interface trong Pod
+            - "--port=5432"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+# --- Helper template definitions (usually in _helpers.tpl) ---
+# For simplicity, we include minimal versions here.
+---
+# Source: microservices-umbrella/charts/kong-config/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app-kong-ingress
+  labels:
+    app.kubernetes.io/name: kong-ingress
+    app.kubernetes.io/instance: my-app
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    kubernetes.io/ingress.class: kong
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - path: /orders
+        pathType: Prefix # Or ImplementationSpecific if using complex regex with KongIngress
+        backend:
+          service:
+            # Construct the service name based on the release name and the service suffix
+            name: my-app-order-service
+            port:
+              number: 80
+      - path: /products
+        pathType: Prefix # Or ImplementationSpecific if using complex regex with KongIngress
+        backend:
+          service:
+            # Construct the service name based on the release name and the service suffix
+            name: my-app-product-service
+            port:
+              number: 80
+      - path: /users
+        pathType: Prefix # Or ImplementationSpecific if using complex regex with KongIngress
+        backend:
+          service:
+            # Construct the service name based on the release name and the service suffix
+            name: my-app-user-service
+            port:
+              number: 80
